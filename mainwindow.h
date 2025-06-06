@@ -27,15 +27,6 @@ public:
     ~MainWindow();
 
 private slots:
-    // File menu slots
-    void on_actionSave_Results_triggered();
-    void on_actionLoad_Results_triggered();
-    void on_actionExit_triggered();
-
-    // Tools menu slots
-    void on_actionExport_CSV_triggered();
-    void on_actionExport_XML_triggered();
-    void on_actionSettings_triggered();
 
     // Help menu slots
     void on_actionAbout_triggered();

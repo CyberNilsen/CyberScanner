@@ -25,87 +25,6 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-// File Menu Functions
-void MainWindow::on_actionSave_Results_triggered()
-{
-    QString fileName = QFileDialog::getSaveFileName(
-        this,
-        tr("Save Scan Results"),
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/scan_results.json",
-        tr("JSON Files (*.json);;All Files (*)")
-        );
-
-    if (!fileName.isEmpty()) {
-        saveResultsToJson(fileName);
-        ui->textEdit_log->append(QString("[INFO] Results saved to: %1").arg(fileName));
-    }
-}
-
-void MainWindow::on_actionLoad_Results_triggered()
-{
-    QString fileName = QFileDialog::getOpenFileName(
-        this,
-        tr("Load Scan Results"),
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
-        tr("JSON Files (*.json);;All Files (*)")
-        );
-
-    if (!fileName.isEmpty()) {
-        loadResultsFromJson(fileName);
-        ui->textEdit_log->append(QString("[INFO] Results loaded from: %1").arg(fileName));
-    }
-}
-
-void MainWindow::on_actionExit_triggered()
-{
-    QMessageBox::StandardButton reply = QMessageBox::question(
-        this,
-        tr("Exit Application"),
-        tr("Are you sure you want to exit?"),
-        QMessageBox::Yes | QMessageBox::No
-        );
-
-    if (reply == QMessageBox::Yes) {
-        QApplication::quit();
-    }
-}
-
-// Tools Menu Functions
-void MainWindow::on_actionExport_CSV_triggered()
-{
-    QString fileName = QFileDialog::getSaveFileName(
-        this,
-        tr("Export to CSV"),
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/scan_results.csv",
-        tr("CSV Files (*.csv);;All Files (*)")
-        );
-
-    if (!fileName.isEmpty()) {
-        exportToCsv(fileName);
-        ui->textEdit_log->append(QString("[INFO] Results exported to CSV: %1").arg(fileName));
-    }
-}
-
-void MainWindow::on_actionExport_XML_triggered()
-{
-    QString fileName = QFileDialog::getSaveFileName(
-        this,
-        tr("Export to XML"),
-        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/scan_results.xml",
-        tr("XML Files (*.xml);;All Files (*)")
-        );
-
-    if (!fileName.isEmpty()) {
-        exportToXml(fileName);
-        ui->textEdit_log->append(QString("[INFO] Results exported to XML: %1").arg(fileName));
-    }
-}
-
-void MainWindow::on_actionSettings_triggered()
-{
-    showSettings();
-}
-
 // Help Menu Functions
 void MainWindow::on_actionAbout_triggered()
 {
@@ -124,10 +43,6 @@ void MainWindow::saveResultsToJson(const QString &filename)
     configObject["portFrom"] = ui->spinBox_portFrom->value();
     configObject["portTo"] = ui->spinBox_portTo->value();
     configObject["customPorts"] = ui->lineEdit_customPorts->text();
-    configObject["scanType"] = ui->comboBox_scanType->currentText();
-    configObject["timeout"] = ui->spinBox_timeout->value();
-    configObject["threads"] = ui->spinBox_threads->value();
-    configObject["grabBanners"] = ui->checkBox_serviceBanner->isChecked();
     rootObject["configuration"] = configObject;
 
     // Save results table data
@@ -175,14 +90,9 @@ void MainWindow::loadResultsFromJson(const QString &filename)
         ui->spinBox_portFrom->setValue(config["portFrom"].toInt());
         ui->spinBox_portTo->setValue(config["portTo"].toInt());
         ui->lineEdit_customPorts->setText(config["customPorts"].toString());
-        ui->spinBox_timeout->setValue(config["timeout"].toInt());
-        ui->spinBox_threads->setValue(config["threads"].toInt());
-        ui->checkBox_serviceBanner->setChecked(config["grabBanners"].toBool());
 
         // Set scan type combobox
         QString scanType = config["scanType"].toString();
-        int index = ui->comboBox_scanType->findText(scanType);
-        if (index >= 0) ui->comboBox_scanType->setCurrentIndex(index);
     }
 
     // Load results
@@ -250,7 +160,6 @@ void MainWindow::exportToXml(const QString &filename)
     stream << "  <configuration>\n";
     stream << "    <target>" << ui->lineEdit_target->text() << "</target>\n";
     stream << "    <port_range>" << ui->spinBox_portFrom->value() << "-" << ui->spinBox_portTo->value() << "</port_range>\n";
-    stream << "    <scan_type>" << ui->comboBox_scanType->currentText() << "</scan_type>\n";
     stream << "  </configuration>\n";
     stream << "  <results>\n";
 

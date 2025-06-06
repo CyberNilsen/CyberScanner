@@ -29,14 +29,14 @@
         <layout class="QHBoxLayout" name="horizontalLayout_target">
          <item>
           <widget class="QLabel" name="label_target">
-           <property name="text">
-            <string>Target Host/IP:</string>
-           </property>
            <property name="minimumSize">
             <size>
              <width>100</width>
              <height>0</height>
             </size>
+           </property>
+           <property name="text">
+            <string>Target Host/IP:</string>
            </property>
           </widget>
          </item>
@@ -83,14 +83,14 @@
         <layout class="QHBoxLayout" name="horizontalLayout_ports">
          <item>
           <widget class="QLabel" name="label_ports">
-           <property name="text">
-            <string>Port Range:</string>
-           </property>
            <property name="minimumSize">
             <size>
              <width>100</width>
              <height>0</height>
             </size>
+           </property>
+           <property name="text">
+            <string>Port Range:</string>
            </property>
           </widget>
          </item>
@@ -181,100 +181,9 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_options">
          <item>
-          <widget class="QLabel" name="label_scanType">
-           <property name="text">
-            <string>Scan Type:</string>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>100</width>
-             <height>0</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="comboBox_scanType">
-           <property name="minimumSize">
-            <size>
-             <width>120</width>
-             <height>0</height>
-            </size>
-           </property>
-           <item>
-            <property name="text">
-             <string>TCP Connect</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>TCP SYN</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>UDP</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_timeout">
-           <property name="text">
-            <string>Timeout:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="spinBox_timeout">
-           <property name="suffix">
-            <string> ms</string>
-           </property>
-           <property name="minimum">
-            <number>100</number>
-           </property>
-           <property name="maximum">
-            <number>10000</number>
-           </property>
-           <property name="value">
-            <number>1000</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_threads">
-           <property name="text">
-            <string>Threads:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="spinBox_threads">
-           <property name="minimum">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <number>200</number>
-           </property>
-           <property name="value">
-            <number>50</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="checkBox_serviceBanner">
-           <property name="text">
-            <string>Grab Banners</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
           <spacer name="horizontalSpacer">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -290,9 +199,6 @@
         <layout class="QHBoxLayout" name="horizontalLayout_buttons">
          <item>
           <widget class="QPushButton" name="pushButton_start">
-           <property name="text">
-            <string>START SCAN</string>
-           </property>
            <property name="minimumSize">
             <size>
              <width>120</width>
@@ -314,21 +220,21 @@ QPushButton:pressed {
     background-color: #3d8b40;
 }</string>
            </property>
+           <property name="text">
+            <string>START SCAN</string>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="pushButton_stop">
-           <property name="text">
-            <string>STOP</string>
+           <property name="enabled">
+            <bool>false</bool>
            </property>
            <property name="minimumSize">
             <size>
              <width>80</width>
              <height>35</height>
             </size>
-           </property>
-           <property name="enabled">
-            <bool>false</bool>
            </property>
            <property name="styleSheet">
             <string>QPushButton {
@@ -345,25 +251,28 @@ QPushButton:pressed {
     background-color: #b71c1c;
 }</string>
            </property>
+           <property name="text">
+            <string>STOP</string>
+           </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="pushButton_clear">
-           <property name="text">
-            <string>CLEAR RESULTS</string>
-           </property>
            <property name="minimumSize">
             <size>
              <width>100</width>
              <height>35</height>
             </size>
            </property>
+           <property name="text">
+            <string>CLEAR RESULTS</string>
+           </property>
           </widget>
          </item>
          <item>
           <spacer name="horizontalSpacer_2">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -380,14 +289,14 @@ QPushButton:pressed {
     </item>
     <item>
      <widget class="QGroupBox" name="groupBox_progress">
-      <property name="title">
-       <string>Scan Progress</string>
-      </property>
       <property name="maximumSize">
        <size>
         <width>16777215</width>
-        <height>80</height>
+        <height>100</height>
        </size>
+      </property>
+      <property name="title">
+       <string>Scan Progress</string>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout_progress">
        <item>
@@ -409,7 +318,7 @@ QPushButton:pressed {
          <item>
           <spacer name="horizontalSpacer_3">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -474,11 +383,6 @@ QPushButton:pressed {
               <string>Closed Only</string>
              </property>
             </item>
-            <item>
-             <property name="text">
-              <string>Filtered Only</string>
-             </property>
-            </item>
            </widget>
           </item>
          </layout>
@@ -489,7 +393,7 @@ QPushButton:pressed {
            <bool>true</bool>
           </property>
           <property name="selectionBehavior">
-           <enum>QAbstractItemView::SelectRows</enum>
+           <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
           </property>
           <property name="sortingEnabled">
            <bool>true</bool>
@@ -548,7 +452,7 @@ QPushButton:pressed {
           <item>
            <spacer name="horizontalSpacer_4">
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
@@ -576,14 +480,14 @@ QPushButton:pressed {
         </item>
         <item>
          <widget class="QTextEdit" name="textEdit_log">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
           <property name="font">
            <font>
             <family>Consolas</family>
             <pointsize>9</pointsize>
            </font>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
           </property>
          </widget>
         </item>
@@ -599,54 +503,19 @@ QPushButton:pressed {
      <x>0</x>
      <y>0</y>
      <width>900</width>
-     <height>22</height>
+     <height>25</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>File</string>
-    </property>
-    <addaction name="actionSave_Results"/>
-    <addaction name="actionLoad_Results"/>
-    <addaction name="separator"/>
-    <addaction name="actionExit"/>
-   </widget>
-   <widget class="QMenu" name="menuTools">
-    <property name="title">
-     <string>Tools</string>
-    </property>
-    <addaction name="actionExport_CSV"/>
-    <addaction name="actionExport_XML"/>
-    <addaction name="separator"/>
-    <addaction name="actionSettings"/>
-   </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>Help</string>
     </property>
     <addaction name="actionAbout"/>
+    <addaction name="actionGithub"/>
    </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuTools"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionSave_Results">
-   <property name="text">
-    <string>Save Results</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+S</string>
-   </property>
-  </action>
-  <action name="actionLoad_Results">
-   <property name="text">
-    <string>Load Results</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+O</string>
-   </property>
-  </action>
   <action name="actionExit">
    <property name="text">
     <string>Exit</string>
@@ -673,6 +542,11 @@ QPushButton:pressed {
   <action name="actionAbout">
    <property name="text">
     <string>About</string>
+   </property>
+  </action>
+  <action name="actionGithub">
+   <property name="text">
+    <string>My Github</string>
    </property>
   </action>
  </widget>
