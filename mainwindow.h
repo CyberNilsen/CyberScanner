@@ -35,11 +35,7 @@ private:
     Ui::MainWindow *ui;
 
     // Helper functions
-    void saveResultsToJson(const QString &filename);
-    void loadResultsFromJson(const QString &filename);
-    void exportToCsv(const QString &filename);
-    void exportToXml(const QString &filename);
-    void showSettings();
+
     void showAbout();
 
     // Add sample data for demonstration
