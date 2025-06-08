@@ -34,7 +34,7 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: ${{ matrix.qt_version }}
-        host: ${{ runner.os }}
+        host: ${{ matrix.os == 'ubuntu-latest' && 'linux' || matrix.os == 'windows-latest' && 'windows' || 'mac' }}
         target: desktop
         modules: 'qtnetworkauth qtmultimedia'
         cache: true
