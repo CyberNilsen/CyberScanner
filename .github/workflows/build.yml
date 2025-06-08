@@ -16,10 +16,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+      uses: jurplel/install-qt-action@v4
       with:
         version: ${{ matrix.qt_version }}
         host: ${{ runner.os }}
@@ -50,16 +50,25 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cd build
-        windeployqt Release/CyberScanner.exe
-        7z a CyberScanner-Windows.zip Release/
+        windeployqt Release/CyberScanner.exe --qmldir ../
+        Compress-Archive -Path Release/* -DestinationPath CyberScanner-Windows.zip
         
     - name: Package (Linux)
       if: runner.os == 'Linux'
       run: |
         cd build
-        mkdir -p AppDir/usr/bin
-        cp cyberscanner AppDir/usr/bin/
-        # Add linuxdeployqt or AppImage creation here
+        mkdir -p package
+        cp cyberscanner package/
+        # Copy Qt libraries
+        ldd cyberscanner | grep "=> /" | awk '{print $3}' | grep -E "(Qt|libicu)" | xargs -I {} cp {} package/ || true
+        tar -czf CyberScanner-Linux.tar.gz -C package .
+        
+    - name: Package (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        cd build
+        macdeployqt CyberScanner.app -dmg
+        mv CyberScanner.dmg CyberScanner-macOS.dmgt or AppImage creation here
         tar -czf CyberScanner-Linux.tar.gz cyberscanner
         
     - name: Package (macOS)
@@ -70,7 +79,7 @@ jobs:
         hdiutil create -srcfolder CyberScanner.app CyberScanner-macOS.dmg
         
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: CyberScanner-${{ runner.os }}
         path: |
