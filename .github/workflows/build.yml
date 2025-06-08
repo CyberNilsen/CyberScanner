@@ -2,7 +2,7 @@ name: Cross-Platform Build
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -10,69 +10,88 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        qt_version: [6.5.0]
+        include:
+          - os: windows-latest
+            qt_version: "6.5.0"
+          - os: ubuntu-latest  
+            qt_version: "6.5.0"
+          - os: macos-latest
+            qt_version: "6.5.0"
         
     runs-on: ${{ matrix.os }}
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
     
-    - name: Install Qt
+    - name: Install Qt (Windows/Mac)
+      if: runner.os != 'Linux'
       uses: jurplel/install-qt-action@v3
       with:
         version: ${{ matrix.qt_version }}
         host: ${{ runner.os }}
         target: desktop
-        modules: 'qtnetwork qtwidgets'
+        modules: qtnetwork qtwidgets
         
-    - name: Configure CMake (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release
+    - name: Install Qt (Linux)
+      if: runner.os == 'Linux'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ matrix.qt_version }}
+        host: linux
+        target: desktop
+        modules: qtnetwork qtwidgets
         
-    - name: Configure CMake (Linux)
+    - name: Install Linux dependencies
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev
-        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        sudo apt-get install -y libgl1-mesa-dev libxkbcommon-x11-0
         
-    - name: Configure CMake (macOS)
-      if: runner.os == 'macOS'
+    - name: Configure and Build
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release
-        
-    - name: Build
-      run: cmake --build build --config Release
+        cmake --build build --config Release
       
-    - name: Package (Windows)
+    - name: Package Windows
       if: runner.os == 'Windows'
       run: |
-        cd build
-        windeployqt Release/CyberScanner.exe
-        Compress-Archive -Path Release/* -DestinationPath CyberScanner-Windows.zip
+        cd build/Release
+        windeployqt CyberScanner.exe
+        Compress-Archive -Path * -DestinationPath ../CyberScanner-Windows.zip
         
-    - name: Package (Linux)
+    - name: Package Linux
       if: runner.os == 'Linux'
       run: |
         cd build
-        mkdir -p package
+        mkdir package
         cp cyberscanner package/
         tar -czf CyberScanner-Linux.tar.gz -C package .
         
-    - name: Package (macOS)
+    - name: Package macOS
       if: runner.os == 'macOS'
       run: |
         cd build
         macdeployqt CyberScanner.app -dmg
         mv CyberScanner.dmg CyberScanner-macOS.dmg
         
-    - name: Upload Artifacts
+    - name: Upload Windows
+      if: runner.os == 'Windows'
       uses: actions/upload-artifact@v4
       with:
-        name: CyberScanner-${{ runner.os }}-${{ github.run_number }}
-        path: |
-          build/CyberScanner-*.zip
-          build/CyberScanner-*.tar.gz
-          build/CyberScanner-*.dmg
+        name: CyberScanner-Windows
+        path: build/CyberScanner-Windows.zip
+        
+    - name: Upload Linux
+      if: runner.os == 'Linux'
+      uses: actions/upload-artifact@v4
+      with:
+        name: CyberScanner-Linux
+        path: build/CyberScanner-Linux.tar.gz
+        
+    - name: Upload macOS
+      if: runner.os == 'macOS'
+      uses: actions/upload-artifact@v4
+      with:
+        name: CyberScanner-macOS
+        path: build/CyberScanner-macOS.dmg
