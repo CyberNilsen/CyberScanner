@@ -22,9 +22,8 @@ jobs:
       uses: jurplel/install-qt-action@v4
       with:
         version: ${{ matrix.qt_version }}
-        host: ${{ runner.os }}
         target: desktop
-        modules: 'qtnetwork qtwidgets'
+        modules: qtnetwork qtwidgets
         
     - name: Configure CMake (Windows)
       if: runner.os == 'Windows'
