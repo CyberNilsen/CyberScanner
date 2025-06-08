@@ -4,8 +4,23 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , scanner(nullptr)
+    , totalPorts(0)
+    , scannedPorts(0)
+    , openPorts(0)
 {
     ui->setupUi(this);
+
+    // Initialize scanner
+    scanner = new PortScanner(this);
+
+    // Connect scanner signals
+    connect(scanner, &PortScanner::scanStarted, this, &MainWindow::onScanStarted);
+    connect(scanner, &PortScanner::scanFinished, this, &MainWindow::onScanFinished);
+    connect(scanner, &PortScanner::scanProgress, this, &MainWindow::onScanProgress);
+    connect(scanner, &PortScanner::portResult, this, &MainWindow::onPortResult);
+    connect(scanner, &PortScanner::scanError, this, &MainWindow::onScanError);
+    connect(scanner, &PortScanner::logMessage, this, &MainWindow::onLogMessage);
 
     // Set up the results table headers
     ui->tableWidget_results->setColumnCount(6);
@@ -16,34 +31,329 @@ MainWindow::MainWindow(QWidget *parent)
     // Resize columns to content
     ui->tableWidget_results->resizeColumnsToContents();
 
-    // Add some sample data for demonstration
-    addSampleResults();
+    // Set up update timer
+    updateTimer = new QTimer(this);
+    connect(updateTimer, &QTimer::timeout, this, &MainWindow::updateUI);
+
+    // Add welcome message to log
+    addLogMessage("Port Scanner initialized - Ready to scan");
+
+    // Remove sample data - we'll use real scanning now
+    // addSampleResults();
 }
 
 MainWindow::~MainWindow()
 {
+    if (scanner && scanner->isScanning()) {
+        scanner->stopScan();
+    }
     delete ui;
 }
 
-// Help Menu Functions
+// Button Handlers
+void MainWindow::on_pushButton_start_clicked()
+{
+    QString target = ui->lineEdit_target->text().trimmed();
+    if (target.isEmpty()) {
+        QMessageBox::warning(this, "Error", "Please enter a target host or IP address.");
+        return;
+    }
+
+    if (!isValidTarget(target)) {
+        QMessageBox::warning(this, "Error", "Invalid target format. Please enter a valid IP address or hostname.");
+        return;
+    }
+
+    // Parse ports
+    QList<int> ports;
+    if (!ui->lineEdit_customPorts->text().trimmed().isEmpty()) {
+        // Use custom ports
+        ports = parsePortRange(ui->lineEdit_customPorts->text());
+    } else {
+        // Use port range
+        int fromPort = ui->spinBox_portFrom->value();
+        int toPort = ui->spinBox_portTo->value();
+        if (fromPort > toPort) {
+            QMessageBox::warning(this, "Error", "Invalid port range. 'From' port must be less than or equal to 'To' port.");
+            return;
+        }
+        for (int i = fromPort; i <= toPort; i++) {
+            ports.append(i);
+        }
+    }
+
+    if (ports.isEmpty()) {
+        QMessageBox::warning(this, "Error", "No valid ports to scan.");
+        return;
+    }
+
+    // Clear previous results
+    clearResults();
+
+    // Start scanning
+    totalPorts = ports.size();
+    addLogMessage(QString("Starting scan of %1 ports on %2").arg(totalPorts).arg(target));
+    scanner->startScan(target, ports);
+}
+
+void MainWindow::on_pushButton_stop_clicked()
+{
+    if (scanner && scanner->isScanning()) {
+        scanner->stopScan();
+        addLogMessage("Scan stopped by user");
+    }
+}
+
+void MainWindow::on_pushButton_clear_clicked()
+{
+    clearResults();
+    addLogMessage("Results cleared");
+}
+
+void MainWindow::on_pushButton_clearLog_clicked()
+{
+    ui->textEdit_log->clear();
+}
+
+void MainWindow::on_pushButton_saveLog_clicked()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, "Save Log", "", "Text Files (*.txt)");
+    if (!fileName.isEmpty()) {
+        QFile file(fileName);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QTextStream stream(&file);
+            stream << ui->textEdit_log->toPlainText();
+            addLogMessage(QString("Log saved to: %1").arg(fileName));
+        } else {
+            QMessageBox::warning(this, "Error", "Could not save log file.");
+        }
+    }
+}
+
+// Filter Handlers
+void MainWindow::on_lineEdit_filter_textChanged(const QString &text)
+{
+    Q_UNUSED(text)
+    applyFilters();
+}
+
+void MainWindow::on_comboBox_filterType_currentTextChanged(const QString &text)
+{
+    Q_UNUSED(text)
+    applyFilters();
+}
+
+// Scanner Event Handlers
+void MainWindow::onScanStarted()
+{
+    ui->pushButton_start->setEnabled(false);
+    ui->pushButton_stop->setEnabled(true);
+    ui->label_status->setText("Status: Scanning...");
+    ui->progressBar->setValue(0);
+    scannedPorts = 0;
+    openPorts = 0;
+    scanTimer.start();
+    updateTimer->start(1000); // Update every second
+}
+
+void MainWindow::onScanFinished()
+{
+    ui->pushButton_start->setEnabled(true);
+    ui->pushButton_stop->setEnabled(false);
+    ui->label_status->setText("Status: Completed");
+    ui->progressBar->setValue(100);
+    updateTimer->stop();
+
+    qint64 elapsed = scanTimer.elapsed();
+    QString timeStr = QString("%1:%2").arg(elapsed / 60000, 2, 10, QChar('0')).arg((elapsed % 60000) / 1000, 2, 10, QChar('0'));
+    addLogMessage(QString("Scan completed. Total time: %1").arg(timeStr));
+}
+
+void MainWindow::onScanProgress(int current, int total)
+{
+    scannedPorts = current;
+    if (total > 0) {
+        int percentage = (current * 100) / total;
+        ui->progressBar->setValue(percentage);
+    }
+}
+
+void MainWindow::onPortResult(int port, const QString &status, const QString &service, const QString &banner, int responseTime)
+{
+    if (status == "Open") {
+        openPorts++;
+    }
+
+    // Add result to table
+    int row = ui->tableWidget_results->rowCount();
+    ui->tableWidget_results->insertRow(row);
+
+    ui->tableWidget_results->setItem(row, 0, new QTableWidgetItem(QString::number(port)));
+    ui->tableWidget_results->setItem(row, 1, new QTableWidgetItem("TCP"));
+    ui->tableWidget_results->setItem(row, 2, new QTableWidgetItem(status));
+    ui->tableWidget_results->setItem(row, 3, new QTableWidgetItem(service));
+    ui->tableWidget_results->setItem(row, 4, new QTableWidgetItem(banner));
+    ui->tableWidget_results->setItem(row, 5, new QTableWidgetItem(responseTime > 0 ? QString("%1ms").arg(responseTime) : "timeout"));
+
+    // Color code the status
+    QTableWidgetItem *statusItem = ui->tableWidget_results->item(row, 2);
+    if (status == "Open") {
+        statusItem->setBackground(QColor(144, 238, 144)); // Light green
+    } else if (status == "Closed") {
+        statusItem->setBackground(QColor(255, 182, 193)); // Light red
+    } else {
+        statusItem->setBackground(QColor(255, 255, 224)); // Light yellow
+    }
+
+    applyFilters();
+    ui->tableWidget_results->resizeColumnsToContents();
+}
+
+void MainWindow::onScanError(const QString &error)
+{
+    addLogMessage(QString("Error: %1").arg(error));
+    QMessageBox::warning(this, "Scan Error", error);
+}
+
+void MainWindow::onLogMessage(const QString &message)
+{
+    addLogMessage(message);
+}
+
+// Helper Functions
+void MainWindow::updateUI()
+{
+    qint64 elapsed = scanTimer.elapsed();
+    QString timeStr = QString("%1:%2").arg(elapsed / 60000, 2, 10, QChar('0')).arg((elapsed % 60000) / 1000, 2, 10, QChar('0'));
+    ui->label_stats->setText(QString("Scanned: %1/%2 | Open: %3 | Time: %4")
+                                 .arg(scannedPorts).arg(totalPorts).arg(openPorts).arg(timeStr));
+}
+
+void MainWindow::clearResults()
+{
+    ui->tableWidget_results->setRowCount(0);
+    ui->progressBar->setValue(0);
+    scannedPorts = 0;
+    openPorts = 0;
+    ui->label_stats->setText("Scanned: 0 | Open: 0 | Time: 00:00");
+}
+
+void MainWindow::applyFilters()
+{
+    QString filterText = ui->lineEdit_filter->text().toLower();
+    QString filterType = ui->comboBox_filterType->currentText();
+
+    for (int i = 0; i < ui->tableWidget_results->rowCount(); ++i) {
+        bool showRow = true;
+
+        // Apply text filter
+        if (!filterText.isEmpty()) {
+            bool matchFound = false;
+            for (int j = 0; j < ui->tableWidget_results->columnCount(); ++j) {
+                QTableWidgetItem *item = ui->tableWidget_results->item(i, j);
+                if (item && item->text().toLower().contains(filterText)) {
+                    matchFound = true;
+                    break;
+                }
+            }
+            if (!matchFound) showRow = false;
+        }
+
+        // Apply status filter
+        if (showRow && filterType != "All") {
+            QTableWidgetItem *statusItem = ui->tableWidget_results->item(i, 2);
+            if (statusItem) {
+                QString status = statusItem->text();
+                if (filterType == "Open Only" && status != "Open") {
+                    showRow = false;
+                } else if (filterType == "Closed Only" && status != "Closed") {
+                    showRow = false;
+                }
+            }
+        }
+
+        ui->tableWidget_results->setRowHidden(i, !showRow);
+    }
+}
+
+QList<int> MainWindow::parsePortRange(const QString &portString)
+{
+    QList<int> ports;
+    QStringList parts = portString.split(',', Qt::SkipEmptyParts);
+
+    for (const QString &part : parts) {
+        QString trimmed = part.trimmed();
+        if (trimmed.contains('-')) {
+            // Range like "80-90"
+            QStringList range = trimmed.split('-');
+            if (range.size() == 2) {
+                bool ok1, ok2;
+                int start = range[0].toInt(&ok1);
+                int end = range[1].toInt(&ok2);
+                if (ok1 && ok2 && start <= end && start > 0 && end <= 65535) {
+                    for (int i = start; i <= end; i++) {
+                        if (!ports.contains(i)) {
+                            ports.append(i);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Single port
+            bool ok;
+            int port = trimmed.toInt(&ok);
+            if (ok && port > 0 && port <= 65535) {
+                if (!ports.contains(port)) {
+                    ports.append(port);
+                }
+            }
+        }
+    }
+
+    std::sort(ports.begin(), ports.end());
+    return ports;
+}
+
+bool MainWindow::isValidTarget(const QString &target)
+{
+    // Check if it's a valid IP address
+    QRegularExpression ipRegex("^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+    if (ipRegex.match(target).hasMatch()) {
+        return true;
+    }
+
+    // Check if it's a valid hostname (basic check)
+    QRegularExpression hostnameRegex("^[a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?(\\.([a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?))*$");
+    return hostnameRegex.match(target).hasMatch();
+}
+
+void MainWindow::addLogMessage(const QString &message)
+{
+    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
+    QString logEntry = QString("[%1] %2").arg(timestamp).arg(message);
+    ui->textEdit_log->append(logEntry);
+
+    if (ui->checkBox_autoScroll->isChecked()) {
+        ui->textEdit_log->moveCursor(QTextCursor::End);
+    }
+}
+
+// Existing functions (Help Menu, Presets, etc.)
 void MainWindow::on_actionAbout_triggered()
 {
     showAbout();
 }
 
-// GitHub Menu Function
 void MainWindow::on_actionGithub_triggered()
 {
     openGithub();
 }
 
-// Target preset combo box handler
 void MainWindow::on_comboBox_presets_currentTextChanged(const QString &text)
 {
     applyTargetPreset(text);
 }
 
-// Port preset combo box handler
 void MainWindow::on_comboBox_portPresets_currentTextChanged(const QString &text)
 {
     applyPortPreset(text);
@@ -51,12 +361,10 @@ void MainWindow::on_comboBox_portPresets_currentTextChanged(const QString &text)
 
 void MainWindow::applyTargetPreset(const QString &preset)
 {
-    // Don't change anything if "Quick Targets" is selected (it's the default/placeholder)
     if (preset == "Quick Targets") {
         return;
     }
 
-    // Apply the selected target to the target input field
     if (preset == "localhost") {
         ui->lineEdit_target->setText("127.0.0.1");
     }
@@ -70,17 +378,14 @@ void MainWindow::applyTargetPreset(const QString &preset)
 
 void MainWindow::applyPortPreset(const QString &preset)
 {
-    // Don't change anything if "Port Presets" is selected (it's the default/placeholder)
     if (preset == "Port Presets") {
         return;
     }
 
-    // Clear the custom ports field and set port range or custom ports based on selection
     ui->lineEdit_customPorts->clear();
 
     if (preset == "Web (80,443,8080,8443)") {
         ui->lineEdit_customPorts->setText("80,443,8080,8443");
-        // Clear the range fields when using custom ports
         ui->spinBox_portFrom->setValue(1);
         ui->spinBox_portTo->setValue(1);
     }
@@ -95,7 +400,6 @@ void MainWindow::applyPortPreset(const QString &preset)
         ui->spinBox_portTo->setValue(1);
     }
     else if (preset == "All (1-65535)") {
-        // For "All ports", use the range instead of custom ports
         ui->lineEdit_customPorts->clear();
         ui->spinBox_portFrom->setValue(1);
         ui->spinBox_portTo->setValue(65535);
@@ -123,12 +427,9 @@ void MainWindow::showAbout()
 
 void MainWindow::openGithub()
 {
-    // Replace "yourusername" with your actual GitHub username
     QString githubUrl = "https://github.com/CyberNilsen";
 
-    // Open the URL in the default web browser
     if (!QDesktopServices::openUrl(QUrl(githubUrl))) {
-        // If opening fails, show an error message
         QMessageBox::warning(
             this,
             tr("Error"),
@@ -139,48 +440,187 @@ void MainWindow::openGithub()
 
 void MainWindow::addSampleResults()
 {
-    // Add some sample data to demonstrate the functionality
-    ui->tableWidget_results->setRowCount(5);
-
-    // Sample row 1
-    ui->tableWidget_results->setItem(0, 0, new QTableWidgetItem("22"));
-    ui->tableWidget_results->setItem(0, 1, new QTableWidgetItem("TCP"));
-    ui->tableWidget_results->setItem(0, 2, new QTableWidgetItem("Open"));
-    ui->tableWidget_results->setItem(0, 3, new QTableWidgetItem("SSH"));
-    ui->tableWidget_results->setItem(0, 4, new QTableWidgetItem("OpenSSH 8.0"));
-    ui->tableWidget_results->setItem(0, 5, new QTableWidgetItem("15ms"));
-
-    // Sample row 2
-    ui->tableWidget_results->setItem(1, 0, new QTableWidgetItem("80"));
-    ui->tableWidget_results->setItem(1, 1, new QTableWidgetItem("TCP"));
-    ui->tableWidget_results->setItem(1, 2, new QTableWidgetItem("Open"));
-    ui->tableWidget_results->setItem(1, 3, new QTableWidgetItem("HTTP"));
-    ui->tableWidget_results->setItem(1, 4, new QTableWidgetItem("Apache/2.4.41"));
-    ui->tableWidget_results->setItem(1, 5, new QTableWidgetItem("23ms"));
-
-    // Sample row 3
-    ui->tableWidget_results->setItem(2, 0, new QTableWidgetItem("443"));
-    ui->tableWidget_results->setItem(2, 1, new QTableWidgetItem("TCP"));
-    ui->tableWidget_results->setItem(2, 2, new QTableWidgetItem("Open"));
-    ui->tableWidget_results->setItem(2, 3, new QTableWidgetItem("HTTPS"));
-    ui->tableWidget_results->setItem(2, 4, new QTableWidgetItem("nginx/1.18.0"));
-    ui->tableWidget_results->setItem(2, 5, new QTableWidgetItem("18ms"));
-
-    // Sample row 4
-    ui->tableWidget_results->setItem(3, 0, new QTableWidgetItem("3389"));
-    ui->tableWidget_results->setItem(3, 1, new QTableWidgetItem("TCP"));
-    ui->tableWidget_results->setItem(3, 2, new QTableWidgetItem("Closed"));
-    ui->tableWidget_results->setItem(3, 3, new QTableWidgetItem("RDP"));
-    ui->tableWidget_results->setItem(3, 4, new QTableWidgetItem(""));
-    ui->tableWidget_results->setItem(3, 5, new QTableWidgetItem("1000ms"));
-
-    // Sample row 5
-    ui->tableWidget_results->setItem(4, 0, new QTableWidgetItem("21"));
-    ui->tableWidget_results->setItem(4, 1, new QTableWidgetItem("TCP"));
-    ui->tableWidget_results->setItem(4, 2, new QTableWidgetItem("Filtered"));
-    ui->tableWidget_results->setItem(4, 3, new QTableWidgetItem("FTP"));
-    ui->tableWidget_results->setItem(4, 4, new QTableWidgetItem(""));
-    ui->tableWidget_results->setItem(4, 5, new QTableWidgetItem("timeout"));
-
-    ui->tableWidget_results->resizeColumnsToContents();
+    // This function is no longer needed as we're using real scanning
+    // Left here for reference if you want to add sample data for testing UI
 }
+
+// Port Scanner Implementation
+PortScanner::PortScanner(QObject *parent)
+    : QObject(parent)
+    , socket(nullptr)
+    , timeoutTimer(new QTimer(this))
+    , scanning(false)
+    , connectionTimeout(3000) // 3 seconds timeout
+{
+    timeoutTimer->setSingleShot(true);
+    connect(timeoutTimer, &QTimer::timeout, this, &PortScanner::onSocketTimeout);
+}
+
+PortScanner::~PortScanner()
+{
+    stopScan();
+}
+
+void PortScanner::startScan(const QString &target, const QList<int> &ports)
+{
+    if (scanning) {
+        return;
+    }
+
+    targetHost = target;
+    portList = ports;
+    currentPortIndex = 0;
+    scanning = true;
+
+    emit scanStarted();
+    emit logMessage(QString("Resolving target: %1").arg(target));
+
+    // Start scanning
+    scanNextPort();
+}
+
+void PortScanner::stopScan()
+{
+    if (!scanning) {
+        return;
+    }
+
+    scanning = false;
+    timeoutTimer->stop();
+
+    if (socket) {
+        socket->abort();
+        socket->deleteLater();
+        socket = nullptr;
+    }
+
+    emit scanFinished();
+}
+
+void PortScanner::scanNextPort()
+{
+    if (!scanning || currentPortIndex >= portList.size()) {
+        stopScan();
+        return;
+    }
+
+    int port = portList[currentPortIndex];
+    emit scanProgress(currentPortIndex + 1, portList.size());
+    emit logMessage(QString("Scanning port %1...").arg(port));
+
+    // Create new socket for this connection
+    if (socket) {
+        socket->deleteLater();
+    }
+
+    socket = new QTcpSocket(this);
+    connect(socket, &QTcpSocket::connected, this, &PortScanner::onSocketConnected);
+    connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::errorOccurred),
+            this, &PortScanner::onSocketError);
+
+    // Start timer for timeout
+    portTimer.start();
+    timeoutTimer->start(connectionTimeout);
+
+    // Attempt connection
+    socket->connectToHost(targetHost, port);
+}
+
+void PortScanner::onSocketConnected()
+{
+    timeoutTimer->stop();
+    int responseTime = portTimer.elapsed();
+    int port = portList[currentPortIndex];
+
+    QString service = getServiceName(port);
+    QString banner = grabBanner(socket, port);
+
+    emit portResult(port, "Open", service, banner, responseTime);
+    emit logMessage(QString("Port %1: OPEN (%2)").arg(port).arg(service));
+
+    socket->disconnectFromHost();
+    currentPortIndex++;
+
+    // Small delay before next port to avoid overwhelming the target
+    QTimer::singleShot(10, this, &PortScanner::scanNextPort);
+}
+
+void PortScanner::onSocketError(QAbstractSocket::SocketError error)
+{
+    timeoutTimer->stop();
+    int responseTime = portTimer.elapsed();
+    int port = portList[currentPortIndex];
+
+    QString status = "Closed";
+    if (error == QAbstractSocket::SocketTimeoutError ||
+        error == QAbstractSocket::NetworkError) {
+        status = "Filtered";
+    }
+
+    QString service = getServiceName(port);
+    emit portResult(port, status, service, "", responseTime);
+
+    currentPortIndex++;
+    QTimer::singleShot(10, this, &PortScanner::scanNextPort);
+}
+
+void PortScanner::onSocketTimeout()
+{
+    if (socket) {
+        socket->abort();
+    }
+
+    int port = portList[currentPortIndex];
+    QString service = getServiceName(port);
+    emit portResult(port, "Filtered", service, "", connectionTimeout);
+    emit logMessage(QString("Port %1: TIMEOUT").arg(port));
+
+    currentPortIndex++;
+    QTimer::singleShot(10, this, &PortScanner::scanNextPort);
+}
+
+QString PortScanner::getServiceName(int port)
+{
+    // Common port to service mapping
+    static QHash<int, QString> services;
+    if (services.isEmpty()) {
+        services[21] = "FTP";
+        services[22] = "SSH";
+        services[23] = "Telnet";
+        services[25] = "SMTP";
+        services[53] = "DNS";
+        services[80] = "HTTP";
+        services[110] = "POP3";
+        services[143] = "IMAP";
+        services[443] = "HTTPS";
+        services[993] = "IMAPS";
+        services[995] = "POP3S";
+        services[3389] = "RDP";
+        services[8080] = "HTTP-Alt";
+        services[8443] = "HTTPS-Alt";
+    }
+
+    return services.value(port, "Unknown");
+}
+
+QString PortScanner::grabBanner(QTcpSocket *socket, int port)
+{
+    if (!socket || !socket->isOpen()) {
+        return "";
+    }
+
+    // Wait a bit for potential banner
+    if (socket->waitForReadyRead(1000)) {
+        QByteArray data = socket->readAll();
+        QString banner = QString::fromUtf8(data).trimmed();
+        // Limit banner length
+        if (banner.length() > 100) {
+            banner = banner.left(100) + "...";
+        }
+        return banner;
+    }
+
+    return "";
+}
+
+#include "mainwindow.moc"

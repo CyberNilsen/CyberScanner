@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RCC>
+    <qresource prefix="/icons">
+        <file>Images/CyberScanner.png</file>
+        <file>Images/CyberScanner16x16.png</file>
+        <file>Images/CyberScanner32x32.png</file>
+        <file>Images/CyberScanner48x48.png</file>
+        <file>Images/CyberScanner64x64.png</file>
+        <file>Images/CyberScanner128x128.png</file>
+        <file>Images/CyberScanner256x256.png</file>
+    </qresource>
+</RCC>
