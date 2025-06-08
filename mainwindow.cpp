@@ -31,6 +31,11 @@ void MainWindow::on_actionAbout_triggered()
     showAbout();
 }
 
+// GitHub Menu Function
+void MainWindow::on_actionGithub_triggered()
+{
+    openGithub();
+}
 
 void MainWindow::showAbout()
 {
@@ -50,6 +55,22 @@ void MainWindow::showAbout()
            "<p><b>Built with Qt Framework</b></p>"
            "<p>© 2024 - Educational purposes only</p>")
         );
+}
+
+void MainWindow::openGithub()
+{
+    // Replace "yourusername" with your actual GitHub username
+    QString githubUrl = "https://github.com/CyberNilsen";
+
+    // Open the URL in the default web browser
+    if (!QDesktopServices::openUrl(QUrl(githubUrl))) {
+        // If opening fails, show an error message
+        QMessageBox::warning(
+            this,
+            tr("Error"),
+            tr("Could not open GitHub link. Please visit: %1").arg(githubUrl)
+            );
+    }
 }
 
 void MainWindow::addSampleResults()
