@@ -1,0 +1,79 @@
+name: Cross-Platform Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        qt_version: [6.5.0]
+        
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: ${{ matrix.qt_version }}
+        host: ${{ runner.os }}
+        target: desktop
+        modules: 'qtnetwork qtwidgets'
+        
+    - name: Configure CMake (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        
+    - name: Configure CMake (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        
+    - name: Configure CMake (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        
+    - name: Build
+      run: cmake --build build --config Release
+      
+    - name: Package (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        cd build
+        windeployqt Release/CyberScanner.exe
+        7z a CyberScanner-Windows.zip Release/
+        
+    - name: Package (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        cd build
+        mkdir -p AppDir/usr/bin
+        cp cyberscanner AppDir/usr/bin/
+        # Add linuxdeployqt or AppImage creation here
+        tar -czf CyberScanner-Linux.tar.gz cyberscanner
+        
+    - name: Package (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        cd build
+        macdeployqt CyberScanner.app
+        hdiutil create -srcfolder CyberScanner.app CyberScanner-macOS.dmg
+        
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: CyberScanner-${{ runner.os }}
+        path: |
+          build/CyberScanner-*.zip
+          build/CyberScanner-*.tar.gz
+          build/CyberScanner-*.dmg
