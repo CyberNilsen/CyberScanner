@@ -21,6 +21,9 @@
 #include <QHostInfo>
 #include <QNetworkInterface>
 #include <QRegularExpression>
+#include <QThreadPool>
+#include <QRunnable>
+#include <QMutexLocker>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -28,7 +31,9 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
+// Forward declarations
 class PortScanner;
+class PortScanTask;
 
 class MainWindow : public QMainWindow
 {
@@ -39,22 +44,26 @@ public:
     ~MainWindow();
 
 private slots:
-
+    // Help menu slots
     void on_actionAbout_triggered();
     void on_actionGithub_triggered();
 
+    // Combo box slots for presets
     void on_comboBox_presets_currentTextChanged(const QString &text);
     void on_comboBox_portPresets_currentTextChanged(const QString &text);
 
+    // Button slots
     void on_pushButton_start_clicked();
     void on_pushButton_stop_clicked();
     void on_pushButton_clear_clicked();
     void on_pushButton_clearLog_clicked();
     void on_pushButton_saveLog_clicked();
 
+    // Filter slot
     void on_lineEdit_filter_textChanged(const QString &text);
     void on_comboBox_filterType_currentTextChanged(const QString &text);
 
+    // Scanner slots
     void onScanStarted();
     void onScanFinished();
     void onScanProgress(int current, int total);
@@ -71,6 +80,7 @@ private:
     int scannedPorts;
     int openPorts;
 
+    // Helper functions
     void showAbout();
     void openGithub();
     void addSampleResults();
@@ -90,7 +100,7 @@ private:
     void addLogMessage(const QString &message);
 };
 
-// Port Scanner Worker Class
+// Fast Multithreaded Port Scanner Class
 class PortScanner : public QObject
 {
     Q_OBJECT
@@ -101,7 +111,10 @@ public:
 
     void startScan(const QString &target, const QList<int> &ports);
     void stopScan();
-    bool isScanning() const { return scanning; }
+    bool isScanning() const;
+
+public slots:
+    void portScanned(int port, const QString &status, const QString &service, const QString &banner, int responseTime);
 
 signals:
     void scanStarted();
@@ -111,25 +124,12 @@ signals:
     void scanError(const QString &error);
     void logMessage(const QString &message);
 
-private slots:
-    void scanNextPort();
-    void onSocketConnected();
-    void onSocketError(QAbstractSocket::SocketError error);
-    void onSocketTimeout();
-
 private:
     QString targetHost;
     QList<int> portList;
-    int currentPortIndex;
-    QTcpSocket *socket;
-    QTimer *timeoutTimer;
-    QElapsedTimer portTimer;
     bool scanning;
     int connectionTimeout;
-
-    QString getServiceName(int port);
-    QString grabBanner(QTcpSocket *socket, int port);
-    void connectToNextPort();
+    int completedScans;
 };
 
 #endif // MAINWINDOW_H

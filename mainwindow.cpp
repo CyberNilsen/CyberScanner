@@ -1,5 +1,115 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
+#include <QThreadPool>
+#include <QRunnable>
+#include <QMutexLocker>
+#include <algorithm>
+
+// Port Scanner Worker for multithreading
+class PortScanTask : public QObject, public QRunnable
+{
+    Q_OBJECT
+public:
+    PortScanTask(const QString &host, int port, int timeout, PortScanner *scanner)
+        : host(host), port(port), timeout(timeout), scanner(scanner)
+    {
+        setAutoDelete(true);
+    }
+
+    void run() override
+    {
+        QElapsedTimer timer;
+        timer.start();
+
+        QTcpSocket socket;
+        socket.connectToHost(host, port);
+
+        bool connected = socket.waitForConnected(timeout);
+        int responseTime = timer.elapsed();
+
+        QString status;
+        QString banner;
+        QString service = getServiceName(port);
+
+        if (connected) {
+            status = "Open";
+            banner = grabBanner(&socket, port);
+            socket.disconnectFromHost();
+        } else {
+            QAbstractSocket::SocketError error = socket.error();
+            if (error == QAbstractSocket::SocketTimeoutError ||
+                error == QAbstractSocket::NetworkError) {
+                status = "Filtered";
+            } else {
+                status = "Closed";
+            }
+        }
+
+        // Emit result through scanner
+        QMetaObject::invokeMethod(scanner, "portScanned", Qt::QueuedConnection,
+                                  Q_ARG(int, port),
+                                  Q_ARG(QString, status),
+                                  Q_ARG(QString, service),
+                                  Q_ARG(QString, banner),
+                                  Q_ARG(int, responseTime));
+    }
+
+private:
+    QString host;
+    int port;
+    int timeout;
+    PortScanner *scanner;
+
+    QString getServiceName(int port)
+    {
+        static QHash<int, QString> services;
+        if (services.isEmpty()) {
+            services[21] = "FTP";
+            services[22] = "SSH";
+            services[23] = "Telnet";
+            services[25] = "SMTP";
+            services[53] = "DNS";
+            services[80] = "HTTP";
+            services[110] = "POP3";
+            services[143] = "IMAP";
+            services[443] = "HTTPS";
+            services[993] = "IMAPS";
+            services[995] = "POP3S";
+            services[3389] = "RDP";
+            services[8080] = "HTTP-Alt";
+            services[8443] = "HTTPS-Alt";
+            services[135] = "RPC";
+            services[139] = "NetBIOS";
+            services[445] = "SMB";
+            services[1433] = "MSSQL";
+            services[3306] = "MySQL";
+            services[5432] = "PostgreSQL";
+            services[6379] = "Redis";
+            services[27017] = "MongoDB";
+        }
+        return services.value(port, "Unknown");
+    }
+
+    QString grabBanner(QTcpSocket *socket, int port)
+    {
+        if (!socket || !socket->isOpen()) {
+            return "";
+        }
+
+        // Wait for banner data
+        if (socket->waitForReadyRead(500)) {
+            QByteArray data = socket->readAll();
+            QString banner = QString::fromUtf8(data).trimmed();
+            // Remove control characters and limit length
+            banner = banner.remove(QRegularExpression("[\\x00-\\x1F\\x7F]"));
+            if (banner.length() > 80) {
+                banner = banner.left(80) + "...";
+            }
+            return banner;
+        }
+        return "";
+    }
+};
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -36,10 +146,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(updateTimer, &QTimer::timeout, this, &MainWindow::updateUI);
 
     // Add welcome message to log
-    addLogMessage("Port Scanner initialized - Ready to scan");
-
-    // Remove sample data - we'll use real scanning now
-    // addSampleResults();
+    addLogMessage("Fast Port Scanner initialized - Ready to scan");
+    addLogMessage("Using multithreaded scanning for maximum speed");
 }
 
 MainWindow::~MainWindow()
@@ -92,7 +200,8 @@ void MainWindow::on_pushButton_start_clicked()
 
     // Start scanning
     totalPorts = ports.size();
-    addLogMessage(QString("Starting scan of %1 ports on %2").arg(totalPorts).arg(target));
+    addLogMessage(QString("Starting fast scan of %1 ports on %2").arg(totalPorts).arg(target));
+    addLogMessage(QString("Using %1 concurrent threads").arg(QThreadPool::globalInstance()->maxThreadCount()));
     scanner->startScan(target, ports);
 }
 
@@ -148,12 +257,12 @@ void MainWindow::onScanStarted()
 {
     ui->pushButton_start->setEnabled(false);
     ui->pushButton_stop->setEnabled(true);
-    ui->label_status->setText("Status: Scanning...");
+    ui->label_status->setText("Status: Fast Scanning...");
     ui->progressBar->setValue(0);
     scannedPorts = 0;
     openPorts = 0;
     scanTimer.start();
-    updateTimer->start(1000); // Update every second
+    updateTimer->start(250); // Update 4 times per second for faster UI updates
 }
 
 void MainWindow::onScanFinished()
@@ -165,8 +274,11 @@ void MainWindow::onScanFinished()
     updateTimer->stop();
 
     qint64 elapsed = scanTimer.elapsed();
-    QString timeStr = QString("%1:%2").arg(elapsed / 60000, 2, 10, QChar('0')).arg((elapsed % 60000) / 1000, 2, 10, QChar('0'));
-    addLogMessage(QString("Scan completed. Total time: %1").arg(timeStr));
+    QString timeStr = QString("%1:%2.%3").arg(elapsed / 60000, 2, 10, QChar('0'))
+                          .arg((elapsed % 60000) / 1000, 2, 10, QChar('0'))
+                          .arg((elapsed % 1000) / 10, 2, 10, QChar('0'));
+    addLogMessage(QString("Fast scan completed. Total time: %1").arg(timeStr));
+    addLogMessage(QString("Scan rate: %1 ports/second").arg(totalPorts * 1000.0 / elapsed, 0, 'f', 1));
 }
 
 void MainWindow::onScanProgress(int current, int total)
@@ -182,6 +294,8 @@ void MainWindow::onPortResult(int port, const QString &status, const QString &se
 {
     if (status == "Open") {
         openPorts++;
+        // Log open ports immediately
+        addLogMessage(QString("OPEN: Port %1 (%2) - %3ms").arg(port).arg(service).arg(responseTime));
     }
 
     // Add result to table
@@ -199,14 +313,21 @@ void MainWindow::onPortResult(int port, const QString &status, const QString &se
     QTableWidgetItem *statusItem = ui->tableWidget_results->item(row, 2);
     if (status == "Open") {
         statusItem->setBackground(QColor(144, 238, 144)); // Light green
+        statusItem->setForeground(QColor(0, 100, 0)); // Dark green text
     } else if (status == "Closed") {
         statusItem->setBackground(QColor(255, 182, 193)); // Light red
+        statusItem->setForeground(QColor(139, 0, 0)); // Dark red text
     } else {
         statusItem->setBackground(QColor(255, 255, 224)); // Light yellow
+        statusItem->setForeground(QColor(139, 139, 0)); // Dark yellow text
     }
 
     applyFilters();
-    ui->tableWidget_results->resizeColumnsToContents();
+
+    // Only resize columns occasionally to avoid performance issues
+    if (row % 10 == 0) {
+        ui->tableWidget_results->resizeColumnsToContents();
+    }
 }
 
 void MainWindow::onScanError(const QString &error)
@@ -224,9 +345,15 @@ void MainWindow::onLogMessage(const QString &message)
 void MainWindow::updateUI()
 {
     qint64 elapsed = scanTimer.elapsed();
-    QString timeStr = QString("%1:%2").arg(elapsed / 60000, 2, 10, QChar('0')).arg((elapsed % 60000) / 1000, 2, 10, QChar('0'));
-    ui->label_stats->setText(QString("Scanned: %1/%2 | Open: %3 | Time: %4")
-                                 .arg(scannedPorts).arg(totalPorts).arg(openPorts).arg(timeStr));
+    QString timeStr = QString("%1:%2.%3").arg(elapsed / 60000, 2, 10, QChar('0'))
+                          .arg((elapsed % 60000) / 1000, 2, 10, QChar('0'))
+                          .arg((elapsed % 1000) / 10, 2, 10, QChar('0'));
+
+    double rate = elapsed > 0 ? (scannedPorts * 1000.0 / elapsed) : 0;
+
+    ui->label_stats->setText(QString("Scanned: %1/%2 | Open: %3 | Rate: %4/s | Time: %5")
+                                 .arg(scannedPorts).arg(totalPorts).arg(openPorts)
+                                 .arg(rate, 0, 'f', 1).arg(timeStr));
 }
 
 void MainWindow::clearResults()
@@ -235,7 +362,7 @@ void MainWindow::clearResults()
     ui->progressBar->setValue(0);
     scannedPorts = 0;
     openPorts = 0;
-    ui->label_stats->setText("Scanned: 0 | Open: 0 | Time: 00:00");
+    ui->label_stats->setText("Scanned: 0 | Open: 0 | Rate: 0.0/s | Time: 00:00.00");
 }
 
 void MainWindow::applyFilters()
@@ -329,7 +456,7 @@ bool MainWindow::isValidTarget(const QString &target)
 
 void MainWindow::addLogMessage(const QString &message)
 {
-    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss");
+    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
     QString logEntry = QString("[%1] %2").arg(timestamp).arg(message);
     ui->textEdit_log->append(logEntry);
 
@@ -395,7 +522,7 @@ void MainWindow::applyPortPreset(const QString &preset)
         ui->spinBox_portTo->setValue(1);
     }
     else if (preset == "Common (21,22,23,25,53,80,110,443)") {
-        ui->lineEdit_customPorts->setText("21,22,23,25,53,80,110,443");
+        ui->lineEdit_customPorts->setText("21,22,23,25,53,80,110,443,135,139,445,1433,3306,3389");
         ui->spinBox_portFrom->setValue(1);
         ui->spinBox_portTo->setValue(1);
     }
@@ -410,16 +537,18 @@ void MainWindow::showAbout()
 {
     QMessageBox::about(
         this,
-        tr("About Port Scanner"),
-        tr("<h3>Port Scanner v1.0</h3>"
-           "<p>A network port scanning tool built with Qt.</p>"
+        tr("About Fast Port Scanner"),
+        tr("<h3>Fast Port Scanner v2.0</h3>"
+           "<p>A high-speed multithreaded network port scanning tool built with Qt.</p>"
            "<p><b>Features:</b></p>"
            "<ul>"
-           "<li>TCP scanning</li>"
-           "<li>Multi-threaded scanning</li>"
+           "<li>Multithreaded TCP scanning for maximum speed</li>"
+           "<li>Real-time results with progress tracking</li>"
            "<li>Service banner grabbing</li>"
-           "<li>Customizable port ranges</li>"
+           "<li>Customizable port ranges and timeout</li>"
+           "<li>Advanced filtering and result export</li>"
            "</ul>"
+           "<p><b>Performance:</b> Can scan thousands of ports per second</p>"
            "<p><b>Built with Qt Framework</b></p>"
            "<p>© 2025 - Educational purposes only</p>")
         );
@@ -444,16 +573,16 @@ void MainWindow::addSampleResults()
     // Left here for reference if you want to add sample data for testing UI
 }
 
-// Port Scanner Implementation
+// Fast Port Scanner Implementation
 PortScanner::PortScanner(QObject *parent)
     : QObject(parent)
-    , socket(nullptr)
-    , timeoutTimer(new QTimer(this))
     , scanning(false)
-    , connectionTimeout(3000) // 3 seconds timeout
+    , connectionTimeout(1000) // Reduced to 1 second for speed
+    , completedScans(0)
 {
-    timeoutTimer->setSingleShot(true);
-    connect(timeoutTimer, &QTimer::timeout, this, &PortScanner::onSocketTimeout);
+    // Set optimal thread count (usually CPU cores * 2 for I/O bound operations)
+    int optimalThreads = QThread::idealThreadCount() * 4;
+    QThreadPool::globalInstance()->setMaxThreadCount(optimalThreads);
 }
 
 PortScanner::~PortScanner()
@@ -469,14 +598,17 @@ void PortScanner::startScan(const QString &target, const QList<int> &ports)
 
     targetHost = target;
     portList = ports;
-    currentPortIndex = 0;
+    completedScans = 0;
     scanning = true;
 
     emit scanStarted();
-    emit logMessage(QString("Resolving target: %1").arg(target));
+    emit logMessage(QString("Starting multithreaded scan with %1 threads").arg(QThreadPool::globalInstance()->maxThreadCount()));
 
-    // Start scanning
-    scanNextPort();
+    // Submit all ports as separate tasks to thread pool
+    for (int port : ports) {
+        PortScanTask *task = new PortScanTask(target, port, connectionTimeout, this);
+        QThreadPool::globalInstance()->start(task);
+    }
 }
 
 void PortScanner::stopScan()
@@ -486,141 +618,34 @@ void PortScanner::stopScan()
     }
 
     scanning = false;
-    timeoutTimer->stop();
-
-    if (socket) {
-        socket->abort();
-        socket->deleteLater();
-        socket = nullptr;
-    }
+    // Clear the thread pool
+    QThreadPool::globalInstance()->clear();
+    QThreadPool::globalInstance()->waitForDone(5000); // Wait max 5 seconds
 
     emit scanFinished();
 }
 
-void PortScanner::scanNextPort()
+void PortScanner::portScanned(int port, const QString &status, const QString &service, const QString &banner, int responseTime)
 {
-    if (!scanning || currentPortIndex >= portList.size()) {
-        stopScan();
+    if (!scanning) {
         return;
     }
 
-    int port = portList[currentPortIndex];
-    emit scanProgress(currentPortIndex + 1, portList.size());
-    emit logMessage(QString("Scanning port %1...").arg(port));
+    completedScans++;
 
-    // Create new socket for this connection
-    if (socket) {
-        socket->deleteLater();
+    emit portResult(port, status, service, banner, responseTime);
+    emit scanProgress(completedScans, portList.size());
+
+    // Check if all ports are done
+    if (completedScans >= portList.size()) {
+        scanning = false;
+        emit scanFinished();
     }
-
-    socket = new QTcpSocket(this);
-    connect(socket, &QTcpSocket::connected, this, &PortScanner::onSocketConnected);
-    connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::errorOccurred),
-            this, &PortScanner::onSocketError);
-
-    // Start timer for timeout
-    portTimer.start();
-    timeoutTimer->start(connectionTimeout);
-
-    // Attempt connection
-    socket->connectToHost(targetHost, port);
 }
 
-void PortScanner::onSocketConnected()
+bool PortScanner::isScanning() const
 {
-    timeoutTimer->stop();
-    int responseTime = portTimer.elapsed();
-    int port = portList[currentPortIndex];
-
-    QString service = getServiceName(port);
-    QString banner = grabBanner(socket, port);
-
-    emit portResult(port, "Open", service, banner, responseTime);
-    emit logMessage(QString("Port %1: OPEN (%2)").arg(port).arg(service));
-
-    socket->disconnectFromHost();
-    currentPortIndex++;
-
-    // Small delay before next port to avoid overwhelming the target
-    QTimer::singleShot(10, this, &PortScanner::scanNextPort);
-}
-
-void PortScanner::onSocketError(QAbstractSocket::SocketError error)
-{
-    timeoutTimer->stop();
-    int responseTime = portTimer.elapsed();
-    int port = portList[currentPortIndex];
-
-    QString status = "Closed";
-    if (error == QAbstractSocket::SocketTimeoutError ||
-        error == QAbstractSocket::NetworkError) {
-        status = "Filtered";
-    }
-
-    QString service = getServiceName(port);
-    emit portResult(port, status, service, "", responseTime);
-
-    currentPortIndex++;
-    QTimer::singleShot(10, this, &PortScanner::scanNextPort);
-}
-
-void PortScanner::onSocketTimeout()
-{
-    if (socket) {
-        socket->abort();
-    }
-
-    int port = portList[currentPortIndex];
-    QString service = getServiceName(port);
-    emit portResult(port, "Filtered", service, "", connectionTimeout);
-    emit logMessage(QString("Port %1: TIMEOUT").arg(port));
-
-    currentPortIndex++;
-    QTimer::singleShot(10, this, &PortScanner::scanNextPort);
-}
-
-QString PortScanner::getServiceName(int port)
-{
-    // Common port to service mapping
-    static QHash<int, QString> services;
-    if (services.isEmpty()) {
-        services[21] = "FTP";
-        services[22] = "SSH";
-        services[23] = "Telnet";
-        services[25] = "SMTP";
-        services[53] = "DNS";
-        services[80] = "HTTP";
-        services[110] = "POP3";
-        services[143] = "IMAP";
-        services[443] = "HTTPS";
-        services[993] = "IMAPS";
-        services[995] = "POP3S";
-        services[3389] = "RDP";
-        services[8080] = "HTTP-Alt";
-        services[8443] = "HTTPS-Alt";
-    }
-
-    return services.value(port, "Unknown");
-}
-
-QString PortScanner::grabBanner(QTcpSocket *socket, int port)
-{
-    if (!socket || !socket->isOpen()) {
-        return "";
-    }
-
-    // Wait a bit for potential banner
-    if (socket->waitForReadyRead(1000)) {
-        QByteArray data = socket->readAll();
-        QString banner = QString::fromUtf8(data).trimmed();
-        // Limit banner length
-        if (banner.length() > 100) {
-            banner = banner.left(100) + "...";
-        }
-        return banner;
-    }
-
-    return "";
+    return scanning;
 }
 
 #include "mainwindow.moc"
