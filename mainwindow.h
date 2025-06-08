@@ -1,5 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
+
 #include <QMainWindow>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -10,8 +11,8 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QApplication>
-#include <QDesktopServices>  // Add this for opening URLs
-#include <QUrl>              // Add this for URL handling
+#include <QDesktopServices>
+#include <QUrl>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -30,17 +31,23 @@ public:
 private slots:
     // Help menu slots
     void on_actionAbout_triggered();
-    void on_actionGithub_triggered();  // Add this slot for GitHub action
+    void on_actionGithub_triggered();
+
+    // Combo box slots for presets
+    void on_comboBox_presets_currentTextChanged(const QString &text);
+    void on_comboBox_portPresets_currentTextChanged(const QString &text);
 
 private:
     Ui::MainWindow *ui;
 
     // Helper functions
     void showAbout();
-    void openGithub();  // Add this helper function
-
-    // Add sample data for demonstration
+    void openGithub();
     void addSampleResults();
+
+    // Preset handling functions
+    void applyTargetPreset(const QString &preset);
+    void applyPortPreset(const QString &preset);
 };
 
 #endif // MAINWINDOW_H

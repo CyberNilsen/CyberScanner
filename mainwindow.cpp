@@ -37,23 +37,87 @@ void MainWindow::on_actionGithub_triggered()
     openGithub();
 }
 
+// Target preset combo box handler
+void MainWindow::on_comboBox_presets_currentTextChanged(const QString &text)
+{
+    applyTargetPreset(text);
+}
+
+// Port preset combo box handler
+void MainWindow::on_comboBox_portPresets_currentTextChanged(const QString &text)
+{
+    applyPortPreset(text);
+}
+
+void MainWindow::applyTargetPreset(const QString &preset)
+{
+    // Don't change anything if "Quick Targets" is selected (it's the default/placeholder)
+    if (preset == "Quick Targets") {
+        return;
+    }
+
+    // Apply the selected target to the target input field
+    if (preset == "localhost") {
+        ui->lineEdit_target->setText("127.0.0.1");
+    }
+    else if (preset == "192.168.1.1") {
+        ui->lineEdit_target->setText("192.168.1.1");
+    }
+    else if (preset == "8.8.8.8") {
+        ui->lineEdit_target->setText("8.8.8.8");
+    }
+}
+
+void MainWindow::applyPortPreset(const QString &preset)
+{
+    // Don't change anything if "Port Presets" is selected (it's the default/placeholder)
+    if (preset == "Port Presets") {
+        return;
+    }
+
+    // Clear the custom ports field and set port range or custom ports based on selection
+    ui->lineEdit_customPorts->clear();
+
+    if (preset == "Web (80,443,8080,8443)") {
+        ui->lineEdit_customPorts->setText("80,443,8080,8443");
+        // Clear the range fields when using custom ports
+        ui->spinBox_portFrom->setValue(1);
+        ui->spinBox_portTo->setValue(1);
+    }
+    else if (preset == "Mail (25,110,143,993,995)") {
+        ui->lineEdit_customPorts->setText("25,110,143,993,995");
+        ui->spinBox_portFrom->setValue(1);
+        ui->spinBox_portTo->setValue(1);
+    }
+    else if (preset == "Common (21,22,23,25,53,80,110,443)") {
+        ui->lineEdit_customPorts->setText("21,22,23,25,53,80,110,443");
+        ui->spinBox_portFrom->setValue(1);
+        ui->spinBox_portTo->setValue(1);
+    }
+    else if (preset == "All (1-65535)") {
+        // For "All ports", use the range instead of custom ports
+        ui->lineEdit_customPorts->clear();
+        ui->spinBox_portFrom->setValue(1);
+        ui->spinBox_portTo->setValue(65535);
+    }
+}
+
 void MainWindow::showAbout()
 {
     QMessageBox::about(
         this,
         tr("About Port Scanner"),
         tr("<h3>Port Scanner v1.0</h3>"
-           "<p>A powerful network port scanning tool built with Qt.</p>"
+           "<p>A network port scanning tool built with Qt.</p>"
            "<p><b>Features:</b></p>"
            "<ul>"
-           "<li>TCP Connect, SYN, and UDP scanning</li>"
+           "<li>TCP scanning</li>"
            "<li>Multi-threaded scanning</li>"
            "<li>Service banner grabbing</li>"
-           "<li>Results export (CSV, XML, JSON)</li>"
            "<li>Customizable port ranges</li>"
            "</ul>"
            "<p><b>Built with Qt Framework</b></p>"
-           "<p>© 2024 - Educational purposes only</p>")
+           "<p>© 2025 - Educational purposes only</p>")
         );
 }
 
