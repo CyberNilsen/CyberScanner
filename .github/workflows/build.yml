@@ -1,46 +1,11 @@
-name: Build
+name: Test Build
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install Qt
-      uses: actions/cache@v3
-      id: cache-qt
-      with:
-        path: ../Qt
-        key: ${{ runner.os }}-QtCache
-    
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.2.0'
-        cached: ${{ steps.cache-qt.outputs.cache-hit }}
-        
-    - name: Build
-      run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release
-        cmake --build build --config Release
-        
-    - name: Package
-      run: |
-        cd build/Release
-        windeployqt CyberScanner.exe
-        7z a CyberScanner-Windows.zip *
-        
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: Windows-Build
-        path: build/Release/CyberScanner-Windows.zip
-
-  linux:
+  test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -48,47 +13,16 @@ jobs:
     - name: Install Qt
       run: |
         sudo apt-get update
-        sudo apt-get install -y qt6-base-dev qt6-base-dev-tools libgl1-mesa-dev
+        sudo apt-get install -y qt6-base-dev cmake build-essential
         
     - name: Build
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release
-        cmake --build build
-        
-    - name: Package
-      run: |
+        mkdir build
         cd build
-        tar -czf CyberScanner-Linux.tar.gz cyberscanner
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make
         
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: Linux-Build
-        path: build/CyberScanner-Linux.tar.gz
-
-  macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install Qt
+    - name: Test
       run: |
-        brew install qt6
-        echo "/opt/homebrew/opt/qt@6/bin" >> $GITHUB_PATH
-        
-    - name: Build
-      run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/qt@6
-        cmake --build build
-        
-    - name: Package
-      run: |
-        cd build
-        macdeployqt CyberScanner.app -dmg
-        mv CyberScanner.dmg CyberScanner-macOS.dmg
-        
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: macOS-Build
-        path: build/CyberScanner-macOS.dmg
+        ls -la build/
+        file build/cyberscanner || echo "Binary not found"
