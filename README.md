@@ -2,8 +2,6 @@
 
 A lightweight TCP port scanner built with Qt and C++ for network reconnaissance and security testing.
 
-## CyberScanner Preview
-
 ![CyberScanner Preview](https://github.com/user-attachments/assets/37e3f3f1-4877-4f72-947a-a9e3b837c322)
 
 
