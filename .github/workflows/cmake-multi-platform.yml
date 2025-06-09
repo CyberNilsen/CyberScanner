@@ -100,22 +100,18 @@ jobs:
       run: |
         mkdir -p deploy
         echo "Looking for CyberScanner executable..."
-        find "${{ steps.strings.outputs.build-output-dir }}" -name "CyberScanner*" -type f
-        if [ -f "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" ]; then
+        if [ -f "${{ steps.strings.outputs.build-output-dir }}/cyberscanner" ]; then
+          echo "Found cyberscanner (lowercase) in build directory"
+          cp "${{ steps.strings.outputs.build-output-dir }}/cyberscanner" deploy/CyberScanner
+        elif [ -f "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" ]; then
           echo "Found CyberScanner in root build directory"
           cp "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" deploy/
         elif [ -f "${{ steps.strings.outputs.build-output-dir }}/Release/CyberScanner" ]; then
           echo "Found CyberScanner in Release directory"
           cp "${{ steps.strings.outputs.build-output-dir }}/Release/CyberScanner" deploy/
-        elif [ -f "${{ steps.strings.outputs.build-output-dir }}/Debug/CyberScanner" ]; then
-          echo "Found CyberScanner in Debug directory"
-          cp "${{ steps.strings.outputs.build-output-dir }}/Debug/CyberScanner" deploy/
         else
-          echo "CyberScanner executable not found anywhere"
-          echo "Build directory contents:"
+          echo "CyberScanner executable not found"
           ls -la "${{ steps.strings.outputs.build-output-dir }}/"
-          echo "Searching for any executable files:"
-          find "${{ steps.strings.outputs.build-output-dir }}" -type f -executable -name "*CyberScanner*" || echo "No CyberScanner executables found"
           exit 1
         fi
         chmod +x deploy/CyberScanner
