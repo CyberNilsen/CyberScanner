@@ -14,9 +14,8 @@
    <string> CyberScanner</string>
   </property>
   <property name="windowIcon">
-    <iconset resource="resources.qrc">
-      <normaloff>:/icons/Images/CyberScanner.png</normaloff>
-    </iconset>
+   <iconset resource="resources.qrc">
+    <normaloff>:/icons/Images/CyberScanner.png</normaloff>:/icons/Images/CyberScanner.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_main">
@@ -180,7 +179,173 @@
         </layout>
        </item>
        <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_scanType">
+         <item>
+          <widget class="QLabel" name="label_scanType">
+           <property name="minimumSize">
+            <size>
+             <width>100</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>Scan Type:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBox_scanType">
+           <property name="minimumSize">
+            <size>
+             <width>150</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Select the type of port scan to perform</string>
+           </property>
+           <item>
+            <property name="text">
+             <string>TCP Connect (Normal)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>TCP SYN (Stealth)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>UDP Scan</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>TCP FIN Scan</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>TCP XMAS Scan</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>TCP NULL Scan</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>TCP ACK Scan</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>TCP Window Scan</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_timing">
+           <property name="text">
+            <string>Timing:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="comboBox_timing">
+           <property name="minimumSize">
+            <size>
+             <width>100</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Scan timing template (affects speed and stealth)</string>
+           </property>
+           <item>
+            <property name="text">
+             <string>T0 (Paranoid)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>T1 (Sneaky)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>T2 (Polite)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>T3 (Normal)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>T4 (Aggressive)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>T5 (Insane)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_5">
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_options">
+         <item>
+          <widget class="QCheckBox" name="checkBox_detectService">
+           <property name="text">
+            <string>Service Detection</string>
+           </property>
+           <property name="toolTip">
+            <string>Attempt to detect service/version info on open ports</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBox_osDetection">
+           <property name="text">
+            <string>OS Detection</string>
+           </property>
+           <property name="toolTip">
+            <string>Attempt to detect target operating system</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="checkBox_aggressiveScan">
+           <property name="text">
+            <string>Aggressive Scan</string>
+           </property>
+           <property name="toolTip">
+            <string>Enable OS detection, version detection, script scanning, and traceroute</string>
+           </property>
+          </widget>
+         </item>
          <item>
           <spacer name="horizontalSpacer">
            <property name="orientation">
@@ -603,6 +768,8 @@ QScrollBar::handle:vertical:hover {
    </property>
   </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

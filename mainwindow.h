@@ -1,6 +1,5 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
-
 #include <QMainWindow>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -14,6 +13,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QTcpSocket>
+#include <QUdpSocket>
 #include <QTimer>
 #include <QThread>
 #include <QMutex>
@@ -24,12 +24,34 @@
 #include <QThreadPool>
 #include <QRunnable>
 #include <QMutexLocker>
+#include <QProcess>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
 }
 QT_END_NAMESPACE
+
+// Enums for scan types and timing
+enum class ScanType {
+    TCP_CONNECT,
+    TCP_SYN,
+    UDP_SCAN,
+    TCP_FIN,
+    TCP_XMAS,
+    TCP_NULL,
+    TCP_ACK,
+    TCP_WINDOW
+};
+
+enum class TimingTemplate {
+    T0_PARANOID,
+    T1_SNEAKY,
+    T2_POLITE,
+    T3_NORMAL,
+    T4_AGGRESSIVE,
+    T5_INSANE
+};
 
 // Forward declarations
 class PortScanner;
@@ -38,7 +60,6 @@ class PortScanTask;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
@@ -51,6 +72,13 @@ private slots:
     // Combo box slots for presets
     void on_comboBox_presets_currentTextChanged(const QString &text);
     void on_comboBox_portPresets_currentTextChanged(const QString &text);
+
+    // New slots for scan options
+    void on_comboBox_scanType_currentTextChanged(const QString &text);
+    void on_comboBox_timing_currentTextChanged(const QString &text);
+    void on_checkBox_osDetection_toggled(bool checked);
+    void on_checkBox_aggressiveScan_toggled(bool checked);
+    void on_checkBox_detectService_toggled(bool checked);
 
     // Button slots
     void on_pushButton_start_clicked();
@@ -70,6 +98,7 @@ private slots:
     void onPortResult(int port, const QString &status, const QString &service, const QString &banner, int responseTime);
     void onScanError(const QString &error);
     void onLogMessage(const QString &message);
+    void onOSDetectionResult(const QString &osInfo);
 
 private:
     Ui::MainWindow *ui;
@@ -79,6 +108,13 @@ private:
     int totalPorts;
     int scannedPorts;
     int openPorts;
+
+    // Scan configuration
+    ScanType currentScanType;
+    TimingTemplate currentTiming;
+    bool serviceDetectionEnabled;
+    bool osDetectionEnabled;
+    bool aggressiveScanEnabled;
 
     // Helper functions
     void showAbout();
@@ -96,25 +132,32 @@ private:
     QList<int> parsePortRange(const QString &portString);
     bool isValidTarget(const QString &target);
 
+    // New helper functions
+    ScanType getScanTypeFromCombo();
+    TimingTemplate getTimingFromCombo();
+
     // Logging
     void addLogMessage(const QString &message);
+
+
 };
 
-// Fast Multithreaded Port Scanner Class
+// Enhanced Port Scanner Class
 class PortScanner : public QObject
 {
     Q_OBJECT
-
 public:
     explicit PortScanner(QObject *parent = nullptr);
     ~PortScanner();
 
-    void startScan(const QString &target, const QList<int> &ports);
+    void startScan(const QString &target, const QList<int> &ports, ScanType scanType,
+                   TimingTemplate timing, bool serviceDetection, bool osDetection, bool aggressive);
     void stopScan();
     bool isScanning() const;
 
 public slots:
-    void portScanned(int port, const QString &status, const QString &service, const QString &banner, int responseTime);
+    void portScanned(int port, const QString &status, const QString &service,
+                     const QString &banner, int responseTime);
 
 signals:
     void scanStarted();
@@ -123,6 +166,10 @@ signals:
     void portResult(int port, const QString &status, const QString &service, const QString &banner, int responseTime);
     void scanError(const QString &error);
     void logMessage(const QString &message);
+    void osDetectionResult(const QString &osInfo);
+
+private slots:
+    void onNmapFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
 private:
     QString targetHost;
@@ -130,6 +177,26 @@ private:
     bool scanning;
     int connectionTimeout;
     int completedScans;
+
+    // Enhanced scan options
+    ScanType scanType;
+    TimingTemplate timingTemplate;
+    bool enableServiceDetection;
+    bool enableOSDetection;
+    bool enableAggressiveScan;
+
+    QProcess *nmapProcess;
+
+    // Helper methods
+    void performOSDetection(const QString &target);
+    void performServiceDetection(const QString &target, const QList<int> &openPorts);
+    QString buildNmapCommand(const QString &target, const QList<int> &ports);
+    int getTimeoutFromTiming(TimingTemplate timing); // Added this declaration
+
+    int getOptimalThreadCount(TimingTemplate timing, ScanType scanType);
+    QString getScanTypeName(ScanType scanType);
+    bool tryNmapOSDetection(const QString &target);
+    void performSimpleOSDetection(const QString &target);
 };
 
 #endif // MAINWINDOW_H
