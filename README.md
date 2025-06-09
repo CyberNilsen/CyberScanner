@@ -109,3 +109,5 @@ For questions, suggestions, or security concerns, please open an issue on GitHub
 ---
 
 **Remember**: Always use this tool responsibly and only on systems you are authorized to test.
+
+## ⭐ If you find this project useful, don’t forget to star the repo and share it!
