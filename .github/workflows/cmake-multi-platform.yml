@@ -44,7 +44,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential libgl1-mesa-dev libxcb-xinerama0-dev libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev libxi-dev libxrender-dev libxcb1-dev libxcb-glx0-dev libxcb-keysyms1-dev libxcb-image0-dev libxcb-shm0-dev libxcb-icccm4-dev libxcb-sync1 libxcb-render-util0-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-render0-dev libxcb-util1 fuse
+        sudo apt-get install -y build-essential libgl1-mesa-dev libxcb-xinerama0-dev libfontconfig1-dev libfreetype6-dev libx11-dev libx11-xcb-dev libxext-dev libxfixes-dev libxi-dev libxrender-dev libxcb1-dev libxcb-glx0-dev libxcb-keysyms1-dev libxcb-image0-dev libxcb-shm0-dev libxcb-icccm4-dev libxcb-sync1 libxcb-render-util0-dev libxcb-xfixes0-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-render0-dev libxcb-util1 fuse libxcb-cursor0 libxcb-cursor-dev
         
     - name: Set reusable strings
       id: strings
@@ -169,11 +169,12 @@ jobs:
         Terminal=false
         EOF
         
-        # Create a simple icon (you should replace this with your actual icon)
-        convert -size 256x256 xc:blue AppDir/usr/share/icons/hicolor/256x256/apps/cyberscanner.png 2>/dev/null || echo "Warning: ImageMagick not available, using placeholder icon"
+        # Create a simple icon placeholder
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        touch AppDir/usr/share/icons/hicolor/256x256/apps/cyberscanner.png
         
         # Copy icon to AppDir root (required by AppImage)
-        cp AppDir/usr/share/icons/hicolor/256x256/apps/cyberscanner.png AppDir/cyberscanner.png 2>/dev/null || touch AppDir/cyberscanner.png
+        cp AppDir/usr/share/icons/hicolor/256x256/apps/cyberscanner.png AppDir/cyberscanner.png
         cp AppDir/usr/share/applications/cyberscanner.desktop AppDir/cyberscanner.desktop
         
         # Download and use linuxdeploy for dependency bundling
@@ -181,12 +182,34 @@ jobs:
         wget -c "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage"
         chmod +x linuxdeploy*.AppImage
         
-        # Bundle Qt dependencies and create AppImage
+        # Set up environment for Qt plugin
         export QMAKE=$Qt6_DIR/bin/qmake
-        ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+        export LD_LIBRARY_PATH=$Qt6_DIR/lib:$LD_LIBRARY_PATH
+        
+        # Try to bundle Qt dependencies and create AppImage with error handling
+        if ! ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage; then
+          echo "linuxdeploy failed, trying alternative approach..."
+          
+          # Alternative: manual Qt deployment
+          mkdir -p AppDir/usr/lib
+          
+          # Copy Qt libraries manually
+          cp -r $Qt6_DIR/lib/libQt6*.so* AppDir/usr/lib/ 2>/dev/null || true
+          cp -r $Qt6_DIR/plugins AppDir/usr/ 2>/dev/null || true
+          
+          # Create simple AppImage manually
+          wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage AppDir CyberScanner-Linux-x86_64.AppImage
+        fi
         
         # Move the created AppImage to deploy folder
-        mv CyberScanner*.AppImage deploy/CyberScanner-Linux-x86_64.AppImage
+        if [ -f "CyberScanner*.AppImage" ]; then
+          mv CyberScanner*.AppImage deploy/CyberScanner-Linux-x86_64.AppImage
+        elif [ -f "CyberScanner-Linux-x86_64.AppImage" ]; then
+          mv CyberScanner-Linux-x86_64.AppImage deploy/
+        fi
+        
         chmod +x deploy/CyberScanner-Linux-x86_64.AppImage
 
     - name: Test (if tests exist)
