@@ -84,15 +84,28 @@ jobs:
       shell: bash
       run: |
         mkdir -p deploy
-        cp "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" deploy/
-        macdeployqt deploy/CyberScanner || echo "macdeployqt not available, copying executable only"
+        if [ -f "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" ]; then
+          cp "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" deploy/
+        elif [ -f "${{ steps.strings.outputs.build-output-dir }}/CyberScanner.app/Contents/MacOS/CyberScanner" ]; then
+          cp -r "${{ steps.strings.outputs.build-output-dir }}/CyberScanner.app" deploy/
+        else
+          echo "CyberScanner executable not found"
+          ls -la "${{ steps.strings.outputs.build-output-dir }}/"
+          exit 1
+        fi
 
     - name: Package Linux Application
       if: runner.os == 'Linux'
       shell: bash
       run: |
         mkdir -p deploy
-        cp "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" deploy/
+        if [ -f "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" ]; then
+          cp "${{ steps.strings.outputs.build-output-dir }}/CyberScanner" deploy/
+        else
+          echo "CyberScanner executable not found"
+          ls -la "${{ steps.strings.outputs.build-output-dir }}/"
+          exit 1
+        fi
 
     - name: Test (if tests exist)
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
