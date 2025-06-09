@@ -203,14 +203,34 @@ jobs:
           ./appimagetool-x86_64.AppImage AppDir CyberScanner-Linux-x86_64.AppImage
         fi
         
-        # Move the created AppImage to deploy folder
-        if [ -f "CyberScanner*.AppImage" ]; then
-          mv CyberScanner*.AppImage deploy/CyberScanner-Linux-x86_64.AppImage
+        # Debug: List all files to see what was created
+        echo "Listing current directory contents:"
+        ls -la
+        echo "Looking for AppImage files:"
+        find . -name "*.AppImage" -type f
+        
+        # Move the created AppImage to deploy folder with better detection
+        APPIMAGE_FILE=""
+        if [ -f "CyberScanner-x86_64.AppImage" ]; then
+          APPIMAGE_FILE="CyberScanner-x86_64.AppImage"
         elif [ -f "CyberScanner-Linux-x86_64.AppImage" ]; then
-          mv CyberScanner-Linux-x86_64.AppImage deploy/
+          APPIMAGE_FILE="CyberScanner-Linux-x86_64.AppImage"
+        else
+          # Find any AppImage file that was created
+          APPIMAGE_FILE=$(find . -maxdepth 1 -name "*.AppImage" -type f | head -1)
         fi
         
-        chmod +x deploy/CyberScanner-Linux-x86_64.AppImage
+        if [ -n "$APPIMAGE_FILE" ] && [ -f "$APPIMAGE_FILE" ]; then
+          echo "Found AppImage: $APPIMAGE_FILE"
+          mv "$APPIMAGE_FILE" deploy/CyberScanner-Linux-x86_64.AppImage
+          chmod +x deploy/CyberScanner-Linux-x86_64.AppImage
+          echo "Successfully moved AppImage to deploy folder"
+        else
+          echo "ERROR: No AppImage file found!"
+          echo "Directory contents:"
+          ls -la
+          exit 1
+        fi
 
     - name: Test (if tests exist)
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
