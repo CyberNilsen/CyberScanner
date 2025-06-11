@@ -32,7 +32,6 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-// Enums for scan types and timing
 enum class ScanType {
     TCP_CONNECT,
     TCP_SYN,
@@ -53,7 +52,6 @@ enum class TimingTemplate {
     T5_INSANE
 };
 
-// Forward declarations
 class PortScanner;
 class PortScanTask;
 
@@ -65,33 +63,28 @@ public:
     ~MainWindow();
 
 private slots:
-    // Help menu slots
+
     void on_actionAbout_triggered();
     void on_actionGithub_triggered();
 
-    // Combo box slots for presets
     void on_comboBox_presets_currentTextChanged(const QString &text);
     void on_comboBox_portPresets_currentTextChanged(const QString &text);
 
-    // New slots for scan options
     void on_comboBox_scanType_currentTextChanged(const QString &text);
     void on_comboBox_timing_currentTextChanged(const QString &text);
     void on_checkBox_osDetection_toggled(bool checked);
     void on_checkBox_aggressiveScan_toggled(bool checked);
     void on_checkBox_detectService_toggled(bool checked);
 
-    // Button slots
     void on_pushButton_start_clicked();
     void on_pushButton_stop_clicked();
     void on_pushButton_clear_clicked();
     void on_pushButton_clearLog_clicked();
     void on_pushButton_saveLog_clicked();
 
-    // Filter slot
     void on_lineEdit_filter_textChanged(const QString &text);
     void on_comboBox_filterType_currentTextChanged(const QString &text);
 
-    // Scanner slots
     void onScanStarted();
     void onScanFinished();
     void onScanProgress(int current, int total);
@@ -109,14 +102,12 @@ private:
     int scannedPorts;
     int openPorts;
 
-    // Scan configuration
     ScanType currentScanType;
     TimingTemplate currentTiming;
     bool serviceDetectionEnabled;
     bool osDetectionEnabled;
     bool aggressiveScanEnabled;
 
-    // Helper functions
     void showAbout();
     void openGithub();
     void addSampleResults();
@@ -124,15 +115,12 @@ private:
     void clearResults();
     void applyFilters();
 
-    // Preset handling functions
     void applyTargetPreset(const QString &preset);
     void applyPortPreset(const QString &preset);
 
-    // Port parsing functions
     QList<int> parsePortRange(const QString &portString);
     bool isValidTarget(const QString &target);
 
-    // New helper functions
     ScanType getScanTypeFromCombo();
     TimingTemplate getTimingFromCombo();
 
@@ -142,7 +130,6 @@ private:
 
 };
 
-// Enhanced Port Scanner Class
 class PortScanner : public QObject
 {
     Q_OBJECT
@@ -178,7 +165,6 @@ private:
     int connectionTimeout;
     int completedScans;
 
-    // Enhanced scan options
     ScanType scanType;
     TimingTemplate timingTemplate;
     bool enableServiceDetection;
@@ -187,7 +173,6 @@ private:
 
     QProcess *nmapProcess;
 
-    // Helper methods
     void performOSDetection(const QString &target);
     void performServiceDetection(const QString &target, const QList<int> &openPorts);
     QString buildNmapCommand(const QString &target, const QList<int> &ports);
@@ -199,4 +184,4 @@ private:
     void performSimpleOSDetection(const QString &target);
 };
 
-#endif // MAINWINDOW_H
+#endif
